@@ -1,0 +1,203 @@
+<%= form_for(@ask, as: :ask) do |f| %>
+    Search Noise Type/City Name: <%= f.text_field :query %>
+    <%= f.submit "Search" %> <br>
+<% end %>
+<h2>The result of searching <%= @search_query %></h2>
+<h2>There are <%= @search_result['hits']['hit'].length %> noise complaints.</h2>
+
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+
+  <style>
+    body{
+      width:1060px;
+      margin:50px auto;
+    }
+    path {  stroke: #fff; }
+    path:hover {  opacity:0.9; }
+    rect:hover {  fill:blue; }
+    .axis {  font: 10px sans-serif; }
+    .legend tr{    border-bottom:1px solid grey; }
+    .legend tr:first-child{    border-top:1px solid grey; }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    .x.axis path {  display: none; }
+    .legend{
+      margin-bottom:76px;
+      display:inline-block;
+      border-collapse: collapse;
+      border-spacing: 0px;
+    }
+    .legend td{
+      padding:4px 5px;
+      vertical-align:bottom;
+    }
+    .legendFreq, .legendPerc{
+      align:right;
+      width:50px;
+    }
+
+  </style>
+
+  <script
+  src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDY0kkJiTPVd2U7aTOAwhc9ySH6oHxOIYM&libraries=visualization&sensor=false">
+  </script>
+
+  <script>
+
+    var twitters = [];
+    var myCenter=[];
+    var myText=[];
+
+
+
+    var KMeans= [];
+    KMeans[0]=[40.75308783,-73.93414523];
+    KMeans[1]=[40.76042746,-73.833525];
+    KMeans[2]=[40.72407217,-73.97866712];
+    KMeans[3]=[40.68442958,-73.94089989];
+    KMeans[4]=[40.63694007,-74.00805749];
+    KMeans[5]=[440.82152285,-73.93934529];
+    KMeans[6]=[40.74276545,-73.99779552];
+    KMeans[7]=[40.68009671,-73.81887491];
+    KMeans[8]=[40.85513528,-73.85518582];
+    KMeans[9]=[40.85991453,-73.90920559];
+
+
+
+    //
+
+    /*
+     * Transfer Ruby hash to Javascript hash
+     */
+    <% @search_result['hits']['hit'].each do |f| %>
+    <% fields =  f['fields'] %>
+    var field_hash = {};
+    field_hash['latitude'] = "<%= fields['latitude'].to_s %>";
+    field_hash['longitude'] = "<%= fields['longitude'].to_s %>";
+    field_hash['text'] = "<%= fields['complaint_type'].to_s %>";
+
+    if (field_hash['latitude'].length != 0 && field_hash['longitude'].length != 0)
+    {twitters.push(field_hash);}
+    <% end %>
+
+
+
+
+
+
+    /*
+     * Put tweets location and text into myCenter & myText.
+     */
+    for(var i in twitters){
+      var lati = parseFloat(twitters[i].latitude);
+      var lgti = parseFloat(twitters[i].longitude);
+
+      myCenter[i]=new google.maps.LatLng(lati,lgti);
+      myText[i]=twitters[i].text;
+    }
+
+    /*
+     * Initialize Google Map with location and text.
+     */
+
+
+    var KmeansCenter=[];
+    for(var i in KMeans){
+      KmeansCenter[i]=new google.maps.LatLng(KMeans[i][0],KMeans[i][1]);
+    }
+    function initialize()
+    {
+      var newYork=new google.maps.LatLng(40.7141667,-74.0063889);
+      var mapProp = {
+        center:new google.maps.LatLng(40.7128,-74.0059),     // Set center to NYC 40.7128° N, 74.0059° W
+        zoom:10,
+        mapTypeId:google.maps.MapTypeId.ROADMAP
+      };
+
+      var map=new google.maps.Map(document.getElementById("googleMap"),mapProp);
+
+      var heatmapData = [];
+      heatmapData[0] = myCenter[0];
+      var indexI=0;
+      for (i = 0; i <300 ; i++) {
+        if(i>130 && i<=176){continue;}
+        heatmapData[indexI] = myCenter[i];
+        indexI++;
+      }
+
+
+
+
+      var heatmap = new google.maps.visualization.HeatmapLayer({
+        data: heatmapData
+      });
+      heatmap.setMap(map);
+
+//      for(var i in myCenter){
+//                var marker=new google.maps.Marker({
+//                    position:myCenter[i]
+//                });
+//                marker.setMap(map);
+
+//        var cityCircle = new google.maps.Circle({
+//          strokeColor: '#FF0000',
+//          strokeOpacity: 0.8,
+//          strokeWeight: 2,
+//          fillColor: '#FF0000',
+//          fillOpacity: 0.35,
+//          map: map,
+//          center: myCenter[i],
+//          radius: 100
+//        });
+//      }
+
+      google.maps.event.addListener(map, "click", function (event) {
+        var clickLatitude = event.latLng.lat();
+        var clickLongitude = event.latLng.lng();
+
+        // Center of map
+        map.panTo(new google.maps.LatLng(clickLatitude,clickLongitude));
+        var dist=0;
+        for(var i in KMeans){
+          dist=dist+1/((KMeans[i][0]-clickLatitude)*(KMeans[i][0]-clickLatitude)+(KMeans[i][1]-clickLongitude)*(KMeans[i][1]-clickLongitude));
+        }
+        dist=dist/10000;
+        var heat="show";
+        if(dist>0.8){
+          heat="very noisy";
+        }else if (dist>0.18){
+          heat="noisy";
+        }else {
+          heat="quiet";
+        }
+        document.getElementById("demo1").innerHTML = clickLatitude;
+        document.getElementById("demo2").innerHTML = clickLongitude;
+        document.getElementById("demo3").innerHTML = dist;
+        document.getElementById("demo4").innerHTML = heat;
+      });
+
+
+
+    }
+
+
+    google.maps.event.addDomListener(window, 'load', initialize);
+
+
+  </script>
+
+
+</head>
+
+<body>
+<div id="googleMap" style="width:750px;height:570px;"></div>
+</body>
